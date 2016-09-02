@@ -4,7 +4,7 @@ var fortune = require('./lib/fortune.js');
 var app = express();
 
 // Test JSHint..
-if ( app.thing == null ) console.log( 'bleat!' );
+//if ( app.thing == null ) console.log( 'bleat!' );
 
 // set up handlebars view engine
 var handlebars = require('express-handlebars').create({
@@ -17,6 +17,12 @@ var handlebars = require('express-handlebars').create({
       }
   }
 });
+
+// tours data (hard-coded)
+var tours = [
+  { id: 0, name: 'Hood River',   price: 99.99 },
+  { id: 1, name: 'Oregon Coast', price: 149.95 }
+];
 
 app.engine('handlebars', handlebars.engine);
 app.set('view engine', 'handlebars');
@@ -47,6 +53,17 @@ app.get('/about', function(req, res){
                });
 });
 
+app.get('/api/tours', function(req, res){
+  res.json(tours);
+});
+
+app.get('/headers', function(req, res){
+  res.set('Content-Type', 'text/plain');
+  var s = '';
+  for(var name in req.headers) s += name + ": " + req.headers[name] + '\n';
+  res.send(s);
+});
+
 app.get('/tours/hood-river', function(req, res){
   res.render('tours/hood-river');
 });
@@ -54,6 +71,8 @@ app.get('/tours/hood-river', function(req, res){
 app.get('/tours/request-group-rate', function(req, res){
   res.render('tours/request-group-rate');
 });
+
+
 
 
 // custom 404 page
