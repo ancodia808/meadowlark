@@ -1,5 +1,6 @@
 var express = require('express');
 var fortune = require('./lib/fortune.js');
+var weather = require('./lib/weather.js');
 
 var app = express();
 
@@ -24,6 +25,7 @@ var tours = [
   { id: 1, name: 'Oregon Coast', price: 149.95 }
 ];
 
+
 app.engine('handlebars', handlebars.engine);
 app.set('view engine', 'handlebars');
 
@@ -38,6 +40,18 @@ app.use(function(req, res, next){
   next();
 });
 
+// Use middleware to set copyright year for use global by the layout...
+app.use(function(req, res, next){
+  res.locals.copyrightYear = '2016';
+  next();
+});
+
+// Use middleware to inject data used by weather partials...
+app.use(function(req, res, next){
+  if(!res.locals.partials) res.locals.partials = {};
+  res.locals.partials.weatherContext = weather.getWeatherData();
+  next();
+});
 
 
 /// Routes
@@ -86,11 +100,44 @@ app.get('/api/tours', function(req, res){
   });
 });
 
+app.get('/data/nursery-rhyme', function(req, res){
+  res.json({
+    animal: 'squirrel',
+    bodyPart: 'tail',
+    adjective: 'bushy',
+    noun: 'heck'
+  });
+});
+
+app.get('/examples/blocks', function(req, res){
+  res.render('examples/blocks', {
+    currency: {
+      name: 'United States Dollars',
+      abbrev: 'USD'
+    },
+    tours: [
+      { name: 'Hood River', price: '$99.95' },
+      { name: 'Oregon Coast', price: '$159.95' }
+    ],
+    specialsUrl: '/january-specials',
+    currencies: [ 'USD', 'GBP', 'BTC'],
+    copyrightYear: '2061'
+  });
+});
+
 app.get('/headers', function(req, res){
   res.set('Content-Type', 'text/plain');
   var s = '';
   for(var name in req.headers) s += name + ": " + req.headers[name] + '\n';
   res.send(s);
+});
+
+app.get('/jquery-test', function(req, res){
+  res.render('jquery-test');
+});
+
+app.get('/nursery-rhyme', function(req, res){
+  res.render('nursery-rhyme');
 });
 
 app.get('/tours/hood-river', function(req, res){
