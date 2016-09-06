@@ -7,7 +7,7 @@
 
     <link rel="stylesheet" href="/css/main.css">
     {{#if showTests}}
-      <link rel="stylesheet" href="/vendor/mocha.css">
+      <link rel="stylesheet" href="/vendor/mocha/css/mocha.css">
     {{/if}}
   </head>
   <body>
@@ -21,8 +21,8 @@
 
     {{#if showTests}}
       <div id="mocha"></div>
-      <script src="/vendor/mocha.js"></script>
-      <script src="/vendor/chai.js"></script>
+      <script src="/vendor/mocha/js/mocha.js"></script>
+      <script src="/vendor/mocha/js/chai.js"></script>
       <script>
         mocha.ui('tdd');
         var assert = chai.assert;

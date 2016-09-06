@@ -13,7 +13,8 @@
     "bootstrap": "^3.3.7",
     "express": "^4.14.0",
     "express-handlebars": "^3.0.0",
-    "formidable": "^1.0.17"
+    "formidable": "^1.0.17",
+    "jquery-file-upload-middleware": "^0.1.8"
   },
   "devDependencies": {
     "chai": "^3.5.0",

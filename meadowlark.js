@@ -1,6 +1,7 @@
 // 3rd Party Modules
 var express = require('express');
 var formidable = require('formidable');
+var jqupload = require('jquery-file-upload-middleware');
 
 // Custom Modules
 var fortune = require('./lib/fortune.js');
@@ -35,6 +36,10 @@ app.set('view engine', 'handlebars');
 app.set('port', process.env.PORT || 3000);
 
 
+//*****************************************************************************
+// Middlewares
+//*****************************************************************************
+
 // Set static middleware...
 app.use(express.static(__dirname + '/public'));
 
@@ -60,8 +65,23 @@ app.use(function(req, res, next){
   next();
 });
 
+// Use mmiddleware to support jQuery file upload...
+app.use('/upload', function(req, res, next){
+  var now = Date.now();
+  jqupload.fileHandler({
+    uploadDir: function(){
+      return __dirname + '/public/uploads/' + now;
+    },
+    uploadUrl: function(){
+      return '/uploads/' + now;
+    }
+  })(req, res, next);
+});
 
-/// Routes
+
+//*****************************************************************************
+// Routes - Gets
+//*****************************************************************************
 app.get('/', function(req, res){
   res.render('home');
 });
@@ -175,6 +195,9 @@ app.get('/tours/request-group-rate', function(req, res){
 
 
 
+//*****************************************************************************
+// Routes - Posts
+//*****************************************************************************
 app.post('/contest/vacation-photo/:year/:month', function(req, res) {
   var form = new formidable.IncomingForm();
 
