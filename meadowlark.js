@@ -65,7 +65,7 @@ app.use(function(req, res, next){
   next();
 });
 
-// Use mmiddleware to support jQuery file upload...
+// Use middleware to support jQuery file upload...
 app.use('/upload', function(req, res, next){
   var now = Date.now();
   jqupload.fileHandler({
@@ -135,6 +135,14 @@ app.get('/contest/vacation-photo', function(req, res){
   });
 });
 
+app.get('/contest/vacation-photo-jquery', function(req, res){
+  var now = new Date();
+  res.render('contest/vacation-photo-jquery', {
+    year: now.getFullYear(),
+    month: now.getMonth()
+  });
+});
+
 app.get('/data/nursery-rhyme', function(req, res){
   res.json({
     animal: 'squirrel',
@@ -145,7 +153,7 @@ app.get('/data/nursery-rhyme', function(req, res){
 });
 
 app.get('/bootstrap-theme-example', function(req, res){
-  res.render('bootstrap-theme-example');
+  res.render('bootstrap/theme-example');
 });
 
 app.get('/examples/blocks', function(req, res){
