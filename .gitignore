@@ -1,4 +1,5 @@
 # ignore packages installed by npm
+credentials.js
 node_modules
 public/uploads
 

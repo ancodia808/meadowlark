@@ -1,11 +1,15 @@
 // 3rd Party Modules
-var express = require('express');
-var formidable = require('formidable');
-var jqupload = require('jquery-file-upload-middleware');
+var express       = require('express');
+var formidable    = require('formidable');
+var jqupload      = require('jquery-file-upload-middleware');
+var nodemailer    = require('nodemailer');
+var smtpTransport = require('nodemailer-smtp-transport');
 
 // Custom Modules
-var fortune = require('./lib/fortune.js');
-var weather = require('./lib/weather.js');
+var credentials = require('./credentials.js');
+var fortune     = require('./lib/fortune.js');
+var weather     = require('./lib/weather.js');
+var emailModule = require('./lib/email.js')(credentials);
 
 var app = express();
 
@@ -30,11 +34,29 @@ var tours = [
   { id: 1, name: 'Oregon Coast', price: 149.95 }
 ];
 
+// slightly modified version of the official W3C HTML5 email regex:
+// https://html.spec.whatwg.org/multipage/forms.html#valid-mail-address
+var VALID_EMAIL_REGEX = new RegExp('^[a-zA-Z-0-9.!#$%&\'*+\/=?^_`{|}~-]+@' +
+                                   '[a-zA-Z-0-9](?:[a-zA-Z-0-9]{0,61}[a-zA-Z-0-9])?' +
+                                   '(?:\.[a-zA-Z-0-9](?:[a-zA-Z-0-9]{0,61}[a-zA-Z-0-9])?)+$');
 
 app.engine('handlebars', handlebars.engine);
 app.set('view engine', 'handlebars');
 app.set('port', process.env.PORT || 3000);
 
+
+// Set up the transport for sending email...
+/*
+var mailTransport = nodemailer.createTransport(smtpTransport({
+  host: 'smtpout.secureserver.net',
+  secureConnection: true,
+  port: 465, // use SSL
+  auth: {
+    user: credentials.godaddySmtp.user,
+    pass: credentials.godaddySmtp.password
+  }
+}));
+*/
 
 //*****************************************************************************
 // Middlewares
@@ -45,6 +67,25 @@ app.use(express.static(__dirname + '/public'));
 
 // Set middleware to support form posts...
 app.use(require('body-parser').urlencoded({ extended: true }));
+
+// Set middleware to support cookies...
+app.use(require('cookie-parser')(credentials.cookieSecret));
+
+// Set middleware to support sessions...
+app.use(require('express-session')({
+  resave: false,
+  saveUninitialized: false,
+  secret: credentials.cookieSecret
+}));
+
+// Set middleware to process header flash messages...
+app.use(function(req, res, next){
+  // if there's a flash message, transfer
+  // it to the context, then clear it
+  res.locals.flash = req.session.flash;
+  delete req.session.flash;
+  next();
+});
 
 // Set middleware for running page tests...
 app.use(function(req, res, next){
@@ -127,6 +168,12 @@ app.get('/api/tours', function(req, res){
   });
 });
 
+app.get('/cart', function(req, res){
+  // We will learn about CSRF later...for now, we just
+  // provide a dummy value
+  res.render('cart/cart', { csrf: 'CSRF token goes here' });
+});
+
 app.get('/contest/vacation-photo', function(req, res){
   var now = new Date();
   res.render('contest/vacation-photo', {
@@ -186,7 +233,7 @@ app.get('/jquery-test', function(req, res){
 app.get('/newsletter', function(req, res){
   // We will learn about CSRF later...for now, we just
   // provide a dummy value
-  res.render('newsletter', { csrf: 'CSRF token goes here' });
+  res.render('newsletter/newsletter', { csrf: 'CSRF token goes here' });
 });
 
 app.get('/nursery-rhyme', function(req, res){
@@ -206,6 +253,75 @@ app.get('/tours/request-group-rate', function(req, res){
 //*****************************************************************************
 // Routes - Posts
 //*****************************************************************************
+app.post('/cart/checkout', function(req, res, next) {
+//  var cart = req.session.cart;
+var cart = {
+  number: 0,
+  billing: {
+    name: 'Unspecified',
+    email: 'Unspecified'
+  }
+};
+
+//  if(!cart) next(new Error('Cart does not exist.'));
+
+  var name = req.body.name || '';
+  var email = req.body.email || '';
+
+  // input validation
+  if(!email.match(VALID_EMAIL_REGEX)) {
+    if(req.xhr) return res.json({ error: 'Invalid name email address.' });
+
+    req.session.flash = {
+      type: 'danger',
+      intro: 'Validation error!',
+      message: 'The email address you entered was not valid.'
+    }
+
+    return res.redirect(303, '/cart');
+  }
+
+  // assign a random cart ID; normally we would us a database ID here
+  cart.number = Math.random().toString().replace(/^0\.0*/, '');
+  cart.billing = {
+    name: name,
+    email: email
+  }
+
+  res.render('cart/email/cart-thank-you',
+             { layout: 'email', cart: cart },
+             function(err, html){
+               if(err) console.log('error in email template');
+
+               /*
+               var mailOptions = {
+                 from: '"Meadowlark Travel" <info@meadowlarktravel.com>',
+                 to: cart.billing.email,
+                 subject: 'Thank You for Booking Your Trip with Meadowlark',
+                 html: html,
+                 generateTextFromHtml: true
+               };
+
+               mailTransport.sendMail(mailOptions, function(err){
+                 if(err) console.error('Unable to send confirmation: ' +
+                                       err.stack);
+               });
+               */
+               emailModule.send(cart.billing.email,
+                                'Thank You for Booking Your Trip with Meadowlark',
+                                html);
+             }
+  );
+
+  req.session.flash = {
+    type: 'success',
+    intro: 'Thank you!',
+    message: 'Thank you for booking your trip with Meadowlark.'
+  }
+
+  res.render('cart/cart-thank-you', { cart: cart });
+});
+
 app.post('/contest/vacation-photo/:year/:month', function(req, res) {
   var form = new formidable.IncomingForm();
 
@@ -220,6 +336,48 @@ app.post('/contest/vacation-photo/:year/:month', function(req, res) {
 
     res.redirect(303, '/thank-you');
   });
+});
+
+app.post('/newsletter', function(req, res) {
+  var name = req.body.name || '';
+  var email = req.body.email || '';
+
+  // input validation
+  if(!email.match(VALID_EMAIL_REGEX)) {
+    if(req.xhr) return res.json({ error: 'Invalid name email address.' });
+
+    req.session.flash = {
+      type: 'danger',
+      intro: 'Validation error!',
+      message: 'The email address you entered was not valid.'
+    }
+
+    return res.redirect(303, '/newsletter/archive');
+  }
+/*
+  new NewsletterSignup({ name: name, email: email }).save(function(err){
+    if(err) {
+      if(req.xhr) return res.json({ error: 'Database error.' });
+
+      req.session.flash = {
+        type: 'danger',
+        intro: 'Database error!',
+        message: 'There was a database error; please try again later.'
+      }
+
+      return res.redirect(303, '/newsletter/archive');
+    }
+  });
+*/
+  if(req.xhr) return res.json({ success: true });
+
+  req.session.flash = {
+    type: 'success',
+    intro: 'Thank you!',
+    message: 'You have now been signed up for the newsletter.'
+  }
+
+  return res.redirect(303, '/newsletter/archive');
 });
 
 app.post('/process', function(req, res) {
