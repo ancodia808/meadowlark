@@ -4,6 +4,7 @@ var formidable    = require('formidable');
 var jqupload      = require('jquery-file-upload-middleware');
 var nodemailer    = require('nodemailer');
 var smtpTransport = require('nodemailer-smtp-transport');
+var sleep         = require('sleep');
 
 // Custom Modules
 var credentials = require('./credentials.js');
@@ -62,6 +63,56 @@ var mailTransport = nodemailer.createTransport(smtpTransport({
 // Middlewares
 //*****************************************************************************
 
+
+var server;
+
+// Use middleware to establish as Node JS "domain"...
+app.use(function(req, res, next){
+  // create a domain for this requests
+  var domain = require('domain').create();
+
+  // handle errors on this domain
+  domain.on('error', function(err){
+    console.error('DOMAIN ERROR CAUGHT\n', err.stack);
+
+    try {
+      // failsafe shutdown in 5 seconods
+      setTimeout(function(){
+        console.error('Failsafe shutdown.');
+        process.exit(1);
+      }, 5000);
+
+      // disconnect from the clustere
+      var worker = require('cluster').worker;
+      if(worker) worker.disconnect();
+
+      // stop taking new requests
+      server.close();
+
+      try {
+        // attempt to use Express error route
+        next(err);
+      } catch(e){
+        // if Express error route failed, try
+        // plain Node response
+        console.error('Express error mechanism failed.\n', e.stack);
+        res.statusCode = 500;
+        res.setHeader('content-type', 'text/plain');
+        res.end('Server error.');
+      }
+    } catch (e) {
+      console.error('Enable to send 500 response.\n', e.stack);
+    }
+  });
+
+  // add the requeust and response objects to the domain
+  domain.add(req);
+  domain.add(res);
+
+  // execute the rest of the request chain in the domain
+  domain.run(next);
+});
+
 // Set static middleware...
 app.use(express.static(__dirname + '/public'));
 
@@ -119,6 +170,26 @@ app.use('/upload', function(req, res, next){
   })(req, res, next);
 });
 
+// Use middleware to configure logging...
+switch(app.get('env')){
+  case 'development':
+    // compact, colorful dev logging
+    app.use(require('morgan')('dev'));
+    break;
+  case 'production':
+    // module 'express-logger' supports daily log rotation
+    app.use(require('express-logger')({
+      path: '/var/log/node/meadowlark.log'
+    }));
+}
+
+// Use middleware to log distribution of requests across cluster...
+app.use(function(req,res,next){
+  var cluster = require('cluster');
+  if(cluster.isWorker) console.log('Worker %d received request...',
+                                   cluster.worker.id);
+  next();
+});
 
 //*****************************************************************************
 // Routes - Gets
@@ -139,14 +210,14 @@ app.get('/api/tours', function(req, res){
   var toursXml = '<?xml version="1.0"?><tours>' +
                  tours.map(function(p){
                    return '<tour price="' + p.price +
-                          '" id="' + p.id + '">' + p.name + '</tour>'
+                          '" id="' + p.id + '">' + p.name + '</tour>';
                  }).join('') +
                  '</tours>';
 
   //console.log('toursXml: ' + toursXml);
 
   var toursText = tours.map(function(p){
-                    return p.id + ': ' + p.name + ' (' + p.price + ')'
+                    return p.id + ': ' + p.name + ' (' + p.price + ')';
                   }).join('\n');
 
   res.format({
@@ -166,6 +237,10 @@ app.get('/api/tours', function(req, res){
       res.send(toursText);
     }
   });
+});
+
+app.get('/bootstrap-theme-example', function(req, res){
+  res.render('bootstrap/theme-example');
 });
 
 app.get('/cart', function(req, res){
@@ -199,8 +274,10 @@ app.get('/data/nursery-rhyme', function(req, res){
   });
 });
 
-app.get('/bootstrap-theme-example', function(req, res){
-  res.render('bootstrap/theme-example');
+app.get('/epic-fail', function(req, res){
+  process.nextTick(function(){
+    throw new Error('Kaboom!');
+  });
 });
 
 app.get('/examples/blocks', function(req, res){
@@ -240,8 +317,18 @@ app.get('/nursery-rhyme', function(req, res){
   res.render('nursery-rhyme');
 });
 
+app.get('/sleep', function(req, res){
+  sleep.sleep(1);
+
+  res.render('sleep');
+});
+
 app.get('/tours/hood-river', function(req, res){
   res.render('tours/hood-river');
+});
+
+app.get('/tours/oregon-coast', function(req, res){
+  res.render('tours/oregon-coast');
 });
 
 app.get('/tours/request-group-rate', function(req, res){
@@ -276,7 +363,7 @@ var cart = {
       type: 'danger',
       intro: 'Validation error!',
       message: 'The email address you entered was not valid.'
-    }
+    };
 
     return res.redirect(303, '/cart');
   }
@@ -286,7 +373,7 @@ var cart = {
   cart.billing = {
     name: name,
     email: email
-  }
+  };
 
   res.render('cart/email/cart-thank-you',
              { layout: 'email', cart: cart },
@@ -317,7 +404,7 @@ var cart = {
     type: 'success',
     intro: 'Thank you!',
     message: 'Thank you for booking your trip with Meadowlark.'
-  }
+  };
 
   res.render('cart/cart-thank-you', { cart: cart });
 });
@@ -350,7 +437,7 @@ app.post('/newsletter', function(req, res) {
       type: 'danger',
       intro: 'Validation error!',
       message: 'The email address you entered was not valid.'
-    }
+    };
 
     return res.redirect(303, '/newsletter/archive');
   }
@@ -375,7 +462,7 @@ app.post('/newsletter', function(req, res) {
     type: 'success',
     intro: 'Thank you!',
     message: 'You have now been signed up for the newsletter.'
-  }
+  };
 
   return res.redirect(303, '/newsletter/archive');
 });
@@ -411,7 +498,19 @@ app.use(function(err, req, res, next) {
   res.render('500');
 });
 
-app.listen(app.get('port'), function(){
-  console.log('Express started on http://localhost:' +
-              app.get('port') + '; press Ctrl-C to terminate.');
-});
+function startServer(){
+  server = app.listen(app.get('port'), function(){
+    console.log('Express started in ' + app.get('env') +
+                ' mode on http://localhost:' + app.get('port') +
+                '; press Ctrl-C to terminate.');
+  });
+}
+
+if(require.main === module){
+  // application run directly; start app server
+  startServer();
+} else {
+  // application immported as a module via "require": export function
+  // to create server
+  module.exports = startServer;
+}
