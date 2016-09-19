@@ -16,3 +16,12 @@ body {
 .theme-showcase .navbar .container {
   width: auto;
 }
+
+a.currency {
+  text-decoration: none;
+}
+
+.currency.selected {
+  font-weight: bold;
+  font-size: 150%
+}

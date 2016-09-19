@@ -145,7 +145,14 @@ Vacation.find(function(err, vacations){
   }).save();
 });
 
-
+function convertFromUSD(value, currency){
+  switch(currency){
+    case 'USD': return value * 1;
+    case 'GBP': return value * 0.6;
+    case 'BTC': return value * 0.00237037918444761;
+    default: return NaN;
+  }
+}
 
 //*****************************************************************************
 // Middlewares
@@ -210,12 +217,32 @@ app.use(require('body-parser').urlencoded({ extended: true }));
 // Set middleware to support cookies...
 app.use(require('cookie-parser')(credentials.cookieSecret));
 
-// Set middleware to support sessions...
+// Set middleware to support memory sessions...
+//app.use(require('express-session')({
+//  resave: false,
+//  saveUninitialized: false,
+//  secret: credentials.cookieSecret
+//}));
+
+// Set middleware to support MongoDB sessions...
+/*
+var MongoSessionStore = require('session-mongoose')(require('connect'));
+var sessionStore = new MongoSessionStore({
+  url: credentials.mongo[app.get('env')].connectionString
+});
+*/
+var session = require('express-session');
+var MongoSessionStore = require('connect-mongo')(session);
+var sessionStore = new MongoSessionStore({
+  url: credentials.mongo[app.get('env')].connectionString
+});
 app.use(require('express-session')({
   resave: false,
   saveUninitialized: false,
-  secret: credentials.cookieSecret
+  secret: credentials.cookieSecret,
+  store: sessionStore
 }));
+
 
 // Set middleware to process header flash messages...
 app.use(function(req, res, next){
@@ -409,6 +436,11 @@ app.get('/nursery-rhyme', function(req, res){
   res.render('nursery-rhyme');
 });
 
+app.get('/set-currency/:currency', function(req, res){
+  req.session.currency = req.params.currency;
+  return res.redirect(303, '/vacations');
+});
+
 app.get('/sleep', function(req, res){
   sleep.sleep(1);
 
@@ -429,17 +461,24 @@ app.get('/tours/request-group-rate', function(req, res){
 
 app.get('/vacations', function(req, res){
   Vacation.find({ available: true }, function(err, vacations){
+    var currency = req.session.currency || 'USD';
     var context = {
       vacations: vacations.map(function(vacation){
         return {
           sku: vacation.sku,
           name: vacation.name,
           description: vacation.description,
-          price: vacation.getDisplayPrice(),
-          inSeason: vacation.inSeason
+          inSeason: vacation.inSeason,
+          price: convertFromUSD(vacation.priceInCents/100, currency),
+          qty: vacation.qty
         };
       })
     };
+    switch(currency){
+      case 'USD': context.currencyUSD = 'selected'; break;
+      case 'GBP': context.currencyGBP = 'selected'; break;
+      case 'BTC': context.currencyBTC = 'selected'; break;
+    }
 
     res.render('vacations', context);
   });
