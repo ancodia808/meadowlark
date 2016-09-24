@@ -22,6 +22,9 @@ if(cluster.isMaster){
   cluster.on('exit', function(worker, code, signal){
     console.log('CLUSTER: Worker %d died with exit code %d (%s).',
                 worker.id, code, signal);
+    // Sleep for 5 seconds to avoid overload during persistent outages..
+    sleep.sleep(5);
+
     startWorker();
   });
 } else {

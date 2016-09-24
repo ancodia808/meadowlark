@@ -8,9 +8,6 @@ var mongoose      = require('mongoose');
 var credentials = require('./credentials.js');
 var weather     = require('./lib/weather.js');
 
-// Custom Models (for Persistence)
-var Vacation                 = require('./models/vacation.js');
-
 var app = express();
 
 // Set up database persistence...
@@ -32,7 +29,7 @@ switch(app.get('env')){
 };
 
 // Load data...
-require('./loaders/vacation.js')();
+require('./loaders/vacations.js')();
 
 // Test JSHint..
 //if ( app.thing == null ) console.log( 'bleat!' );
@@ -54,8 +51,8 @@ app.set('view engine', 'handlebars');
 app.set('port', process.env.PORT || 3000);
 
 
+// Establish static server object to support shutdown for fatal errors...
 var server;
-
 
 
 //*****************************************************************************
@@ -207,17 +204,40 @@ app.use(function(req,res,next){
   next();
 });
 
+// Use middleware to enable CORS for the API...
+app.use('/api', require('cors')());
 
 //*****************************************************************************
 // Routes
 //*****************************************************************************
-var routes = require('./routes.js')(app);
+//var routes = require('./routes.js')(app);
+require('./routes.js')(app);
 
 
 
 //*****************************************************************************
 // Middlewares - Post-Process
 //*****************************************************************************
+
+// Auto Views...
+var autoViews = {};
+
+app.use(function(req,res,next){
+  var path = req.path.toLowerCase();
+
+  // check cache; if it's there, render the view
+  if(autoViews[path]) return res.render(autoViews[path]);
+
+  // if it's not in the cache, see if there's
+  // a .handlebars file that matches
+  if(fs.existsSync(__dirname + '/views' + path + '.handlebars')){
+    autoViews[path] = path.replace(/^\//, '');
+    return res.render(autoViews[path]);
+  }
+
+  // no view found; pass on to 404 handler
+  next();
+});
 
 // custom 404 page
 app.use(function(req, res, next){
@@ -247,7 +267,7 @@ if(require.main === module){
   // application run directly; start app server
   startServer();
 } else {
-  // application immported as a module via "require": export function
+  // application imported as a module via "require": export function
   // to create server
   module.exports = startServer;
 }
