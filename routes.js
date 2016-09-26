@@ -7,8 +7,8 @@ var tourController       = require('./controllers/tour.js');
 var vacationController   = require('./controllers/vacation.js');
 
 // APIs
-var attractionApi = require('./apis/attraction.js');
 var tourApi       = require('./apis/tour.js');
+
 
 module.exports = function(app){
 
@@ -45,10 +45,6 @@ module.exports = function(app){
   app.get ('/notify-me-when-in-season', vacationController.getNotifyMeWhenInSeason);
   app.post('/notify-me-when-in-season', vacationController.postNotifyMeWhenInSeason);
   app.get ('/vacations',                vacationController.vacations);
-
-  app.post('/api/attraction',     attractionApi.postAttraction);
-  app.get ('/api/attraction/:id', attractionApi.getAttraction);
-  app.get ('/api/attractions',    attractionApi.getAttractions);
 
   app.get ('/api/tours', tourApi.getTours)
 };

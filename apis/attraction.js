@@ -1,20 +1,20 @@
 var Attraction = require('../models/attraction.js');
 
-exports.getAttractions = function(req, res){
+exports.getAttractions = function(req, content, cb){
   Attraction.find({ approved: true }, function(err, attractions){
-    if(err) return res.status(500).send('Error occured: database error.');
-    res.json(attractions.map(function(a){
+    if(err) return cb({ error: 'Internal error.'});
+    cb(null, attractions.map(function(a){
       return {
         name: a.name,
         id: a._id,
         description: a.description,
         location: a.location
-      }
+      };
     }));
   });
 };
 
-exports.postAttraction = function(req, res){
+exports.postAttraction = function(req, content, cb){
   var a = new Attraction({
     name: req.body.name,
     description: req.body.description,
@@ -31,15 +31,15 @@ exports.postAttraction = function(req, res){
   });
 
   a.save(function(err, attraction){
-    if(err) return res.status(500).send('Error occured: database error.');
-    res.json({ id: attraction._id });
+    if(err) return cb({ error: 'Unable to add attraction.'});
+    cb(null, { id: attraction._id });
   });
 };
 
-exports.getAttraction = function(req, res){
+exports.getAttraction = function(req, content, cb){
   Attraction.findById(req.params.id, function(err, attraction){
-    if(err) return res.status(500).send('Error occured: database error.');
-    res.json({
+    if(err) return cb({ error: 'Unable to retrieve attraction.'});
+    cb(null, {
       name: attraction.name,
       id: attraction._id,
       description: attraction.description,

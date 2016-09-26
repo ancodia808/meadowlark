@@ -1,4 +1,7 @@
 // 3rd Party Modules
+var bodyParser    = require('body-parser');
+var connect       = require('connect');
+var connectRest   = require('connect-rest');
 var express       = require('express');
 var fs            = require('fs');
 var jqupload      = require('jquery-file-upload-middleware');
@@ -207,11 +210,47 @@ app.use(function(req,res,next){
 // Use middleware to enable CORS for the API...
 app.use('/api', require('cors')());
 
+
+//*****************************************************************************
+// REST API Support...
+//*****************************************************************************
+var connectApp = connect()
+  .use(bodyParser.urlencoded({ extended: true }))
+  .use(bodyParser.json());
+
+var apiOptions = {
+  context: '/api',
+  //logger: { file: 'mochaTest.log', level: 'debug' },
+  //apiKeys: [ '849b7648-14b8-4154-9ef2-8d1dc4c2b7e9' ],
+  //// discover: { path: 'discover', secure: true },
+  //// proto: { path: 'proto', secure: true },
+  domain: require('domain').create()
+};
+
+apiOptions.domain.on('error', function(err){
+  console.log('API domain error.\n', err.stack);
+  setTimeout(function(){
+    console.log('Server shutting down after API domain error.');
+    process.exit(1);
+  }, 5000);
+  server.close();
+  var worker = require('cluster').worker;
+  if(worker) worker.disconnect();
+});
+
+//app.use(rest.rester(apiOptions));
+
+var rest = connectRest.create(apiOptions);
+
+// adds connect-rest middleware to connect
+connectApp.use( rest.processRequest() );
+
+
 //*****************************************************************************
 // Routes
 //*****************************************************************************
-//var routes = require('./routes.js')(app);
 require('./routes.js')(app);
+require('./routes-rest.js')(rest);
 
 
 
@@ -245,6 +284,7 @@ app.use(function(req, res, next){
   res.render('404');
 });
 
+
 // custom 500 page
 app.use(function(err, req, res, next) {
   console.error(err.stack);
@@ -254,7 +294,9 @@ app.use(function(err, req, res, next) {
 });
 
 
-
+//*****************************************************************************
+// Cluster Support
+//*****************************************************************************
 function startServer(){
   server = app.listen(app.get('port'), function(){
     console.log('Express started in ' + app.get('env') +
