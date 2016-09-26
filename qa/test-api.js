@@ -14,7 +14,7 @@ suite('API Tests', function(){
     email: 'test@meadowlarktravel.com'
   };
 
-  var base = 'http://localhost:3000';
+  var base = 'http://api.meadowlark.com:3000';
 
   test('should be able to add an attraction', function(done){
     restler.post(base + '/api/attraction', {data:attraction}).on('success', function(data){

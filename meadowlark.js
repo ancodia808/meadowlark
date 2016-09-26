@@ -6,12 +6,13 @@ var express       = require('express');
 var fs            = require('fs');
 var jqupload      = require('jquery-file-upload-middleware');
 var mongoose      = require('mongoose');
+var vhost         = require('vhost');
 
 // Custom Modules
 var credentials = require('./credentials.js');
 var weather     = require('./lib/weather.js');
 
-var app = express();
+var expressApp = express();
 
 // Set up database persistence...
 var opts = {
@@ -20,7 +21,7 @@ var opts = {
   }
 };
 
-switch(app.get('env')){
+switch(expressApp.get('env')){
   case 'development':
     mongoose.connect(credentials.mongo.development.connectionString, opts);
     break;
@@ -28,14 +29,14 @@ switch(app.get('env')){
     mongoose.connect(credentials.mongo.production.connectionString, opts);
     break;
   default:
-    throw new Error('Unknown execution environment: ' + app.get('env'));
+    throw new Error('Unknown execution environment: ' + expressApp.get('env'));
 };
 
 // Load data...
 require('./loaders/vacations.js')();
 
 // Test JSHint..
-//if ( app.thing == null ) console.log( 'bleat!' );
+//if ( expressApp.thing == null ) console.log( 'bleat!' );
 
 // set up handlebars view engine
 var handlebars = require('express-handlebars').create({
@@ -49,9 +50,9 @@ var handlebars = require('express-handlebars').create({
   }
 });
 
-app.engine('handlebars', handlebars.engine);
-app.set('view engine', 'handlebars');
-app.set('port', process.env.PORT || 3000);
+expressApp.engine('handlebars', handlebars.engine);
+expressApp.set('view engine', 'handlebars');
+expressApp.set('port', process.env.PORT || 3000);
 
 
 // Establish static server object to support shutdown for fatal errors...
@@ -63,7 +64,7 @@ var server;
 //*****************************************************************************
 
 // Use middleware to establish as Node JS "domain"...
-app.use(function(req, res, next){
+expressApp.use(function(req, res, next){
   // create a domain for this requests
   var domain = require('domain').create();
 
@@ -110,16 +111,16 @@ app.use(function(req, res, next){
 });
 
 // Set static middleware...
-app.use(express.static(__dirname + '/public'));
+expressApp.use(express.static(__dirname + '/public'));
 
 // Set middleware to support form posts...
-app.use(require('body-parser').urlencoded({ extended: true }));
+expressApp.use(require('body-parser').urlencoded({ extended: true }));
 
 // Set middleware to support cookies...
-app.use(require('cookie-parser')(credentials.cookieSecret));
+expressApp.use(require('cookie-parser')(credentials.cookieSecret));
 
 // Set middleware to support memory sessions...
-//app.use(require('express-session')({
+//expressApp.use(require('express-session')({
 //  resave: false,
 //  saveUninitialized: false,
 //  secret: credentials.cookieSecret
@@ -129,15 +130,15 @@ app.use(require('cookie-parser')(credentials.cookieSecret));
 /*
 var MongoSessionStore = require('session-mongoose')(require('connect'));
 var sessionStore = new MongoSessionStore({
-  url: credentials.mongo[app.get('env')].connectionString
+  url: credentials.mongo[expressApp.get('env')].connectionString
 });
 */
 var session = require('express-session');
 var MongoSessionStore = require('connect-mongo')(session);
 var sessionStore = new MongoSessionStore({
-  url: credentials.mongo[app.get('env')].connectionString
+  url: credentials.mongo[expressApp.get('env')].connectionString
 });
-app.use(require('express-session')({
+expressApp.use(require('express-session')({
   resave: false,
   saveUninitialized: false,
   secret: credentials.cookieSecret,
@@ -146,7 +147,7 @@ app.use(require('express-session')({
 
 
 // Set middleware to process header flash messages...
-app.use(function(req, res, next){
+expressApp.use(function(req, res, next){
   // if there's a flash message, transfer
   // it to the context, then clear it
   res.locals.flash = req.session.flash;
@@ -155,26 +156,26 @@ app.use(function(req, res, next){
 });
 
 // Set middleware for running page tests...
-app.use(function(req, res, next){
-  res.locals.showTests = app.get('env') !== 'production' && req.query.test === '1';
+expressApp.use(function(req, res, next){
+  res.locals.showTests = expressApp.get('env') !== 'production' && req.query.test === '1';
   next();
 });
 
 // Use middleware to set copyright year for use global by the layout...
-app.use(function(req, res, next){
+expressApp.use(function(req, res, next){
   res.locals.copyrightYear = '2016';
   next();
 });
 
 // Use middleware to inject data used by weather partials...
-app.use(function(req, res, next){
+expressApp.use(function(req, res, next){
   if(!res.locals.partials) res.locals.partials = {};
   res.locals.partials.weatherContext = weather.getWeatherData();
   next();
 });
 
 // Use middleware to support jQuery file upload...
-app.use('/upload', function(req, res, next){
+expressApp.use('/upload', function(req, res, next){
   var now = Date.now();
   jqupload.fileHandler({
     uploadDir: function(){
@@ -187,38 +188,35 @@ app.use('/upload', function(req, res, next){
 });
 
 // Use middleware to configure logging...
-switch(app.get('env')){
+switch(expressApp.get('env')){
   case 'development':
     // compact, colorful dev logging
-    app.use(require('morgan')('dev'));
+    expressApp.use(require('morgan')('dev'));
     break;
   case 'production':
     // module 'express-logger' supports daily log rotation
-    app.use(require('express-logger')({
+    expressApp.use(require('express-logger')({
       path: '/var/log/node/meadowlark.log'
     }));
 }
 
 // Use middleware to log distribution of requests across cluster...
-app.use(function(req,res,next){
+expressApp.use(function(req,res,next){
   var cluster = require('cluster');
   if(cluster.isWorker) console.log('Worker %d received request...',
                                    cluster.worker.id);
   next();
 });
 
-// Use middleware to enable CORS for the API...
-app.use('/api', require('cors')());
-
 
 //*****************************************************************************
 // REST API Support...
 //*****************************************************************************
-/*
-var connectApp = connect()
+var restApp = connect()
   .use(bodyParser.urlencoded({ extended: true }))
   .use(bodyParser.json());
-*/
+
+restApp.use(require('morgan')('dev'));
 
 var apiOptions = {
   context: '/api',
@@ -240,18 +238,18 @@ apiOptions.domain.on('error', function(err){
   if(worker) worker.disconnect();
 });
 
-//app.use(rest.rester(apiOptions));
-
 var rest = connectRest.create(apiOptions);
 
-// adds connect-rest middleware to connect
-app.use( rest.processRequest() );
+restApp.use(rest.processRequest());
+
+// Use middleware to enable CORS for the API...
+//expressApp.use('/api', require('cors')());
 
 
 //*****************************************************************************
 // Routes
 //*****************************************************************************
-require('./routes.js')(app);
+require('./routes.js')(expressApp);
 require('./routes-rest.js')(rest);
 
 
@@ -263,7 +261,7 @@ require('./routes-rest.js')(rest);
 // Auto Views...
 var autoViews = {};
 
-app.use(function(req,res,next){
+expressApp.use(function(req,res,next){
   var path = req.path.toLowerCase();
 
   // check cache; if it's there, render the view
@@ -280,15 +278,16 @@ app.use(function(req,res,next){
   next();
 });
 
+
 // custom 404 page
-app.use(function(req, res, next){
+expressApp.use(function(req, res, next){
   res.status(404);
   res.render('404');
 });
 
 
 // custom 500 page
-app.use(function(err, req, res, next) {
+expressApp.use(function(err, req, res, next) {
   console.error(err.stack);
 
   res.status(500);
@@ -296,13 +295,19 @@ app.use(function(err, req, res, next) {
 });
 
 
+var app = connect();
+app.use(vhost('www.meadowlark.com', expressApp));
+app.use(vhost('api.meadowlark.com', restApp));  // Does not work...
+
+
+
 //*****************************************************************************
 // Cluster Support
 //*****************************************************************************
 function startServer(){
-  server = app.listen(app.get('port'), function(){
-    console.log('Express started in ' + app.get('env') +
-                ' mode on http://localhost:' + app.get('port') +
+  server = app.listen(expressApp.get('port'), function(){
+    console.log('Express started in ' + expressApp.get('env') +
+                ' mode on http://localhost:' + expressApp.get('port') +
                 '; press Ctrl-C to terminate.');
   });
 }

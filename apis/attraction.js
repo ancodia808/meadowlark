@@ -1,7 +1,8 @@
 var Attraction = require('../models/attraction.js');
 
 exports.getAttractions = function(req, content, cb){
-  Attraction.find({ approved: true }, function(err, attractions){
+  //Attraction.find({ approved: true }, function(err, attractions){
+  Attraction.find(function(err, attractions){
     if(err) return cb({ error: 'Internal error.'});
     cb(null, attractions.map(function(a){
       return {
