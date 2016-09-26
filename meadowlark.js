@@ -10,6 +10,7 @@ var vhost         = require('vhost');
 
 // Custom Modules
 var credentials = require('./credentials.js');
+var static      = require('./lib/static.js').map;
 var weather     = require('./lib/weather.js');
 
 var expressApp = express();
@@ -46,6 +47,9 @@ var handlebars = require('express-handlebars').create({
           if(!this._sections) this._sections = {};
           this._sections[name] = options.fn(this);
           return null;
+      },
+      static: function(name) {
+        return require('./lib/static.js').map(name);
       }
   }
 });
@@ -145,6 +149,15 @@ expressApp.use(require('express-session')({
   store: sessionStore
 }));
 
+
+// Set middleware to set date-based logo image...
+expressApp.use(function(req, res, next){
+  var now = new Date();
+  res.locals.logoImage = now.getMonth()==2 && now.getDate()==3 ?
+    static('/img/pwei.png') :
+    static('/img/eric.png');
+  next();
+});
 
 // Set middleware to process header flash messages...
 expressApp.use(function(req, res, next){

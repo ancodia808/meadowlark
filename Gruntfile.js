@@ -4,6 +4,7 @@ module.exports = function(grunt){
   [
     'grunt-cafe-mocha',
     'grunt-contrib-jshint',
+    'grunt-contrib-less',
     'grunt-exec'
   ].forEach(function(task){
     grunt.loadNpmTasks(task);
@@ -20,6 +21,11 @@ module.exports = function(grunt){
         }
       }
     },
+    exec: {
+      linkchecker: {
+        cmd: 'linkchecker http://localhost:3000'
+      }
+    },
     jshint: {
       app: [
         'meadowlark.js',
@@ -32,14 +38,31 @@ module.exports = function(grunt){
         'qa/**/*.js'
       ]
     },
-    exec: {
-      linkchecker: {
-        cmd: 'linkchecker http://localhost:3000'
+    less: {
+      development: {
+        options: {
+          customFunctions: {
+            static: function(lessObject, name) {
+              return 'url("' +
+                     require('./lib/static.js').map(name.value) +
+                     '")';
+            }
+          }
+        },
+        files: {
+          'public/css/main.css': 'less/main.less'
+        }
       }
     }
   });
 
   // register tasks
 //  grunt.registerTask('default', ['cafemocha','jshint','exec']);
-  grunt.registerTask('default', ['cafemocha']);
+//  grunt.registerTask('default', ['cafemocha']);
+  grunt.registerTask('default', [
+    'cafemocha',
+    'exec',
+    'jshint',
+    'less'
+  ]);
 };

@@ -7,7 +7,7 @@
     <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
     <meta name="description" content="">
     <meta name="author" content="">
-    <link rel="icon" href="/img/pwei.png">
+    <link rel="icon" href="{{static '/img/pwei.png'}}">
 
     <title>Meadowlark Travel</title>
 
@@ -29,6 +29,7 @@
     <!-- Custom styles for this template -->
     <link href="/css/theme.css" rel="stylesheet">
     <link href="/css/upload.css" rel="stylesheet">
+    <link href="{{static '/css/main.css'}}" rel="stylesheet">
 
     <!-- Just for debugging purposes. Don't actually copy these 2 lines! -->
     <!--[if lt IE 9]><script src="../../assets/js/ie8-responsive-file-warning.js"></script><![endif]-->
@@ -41,6 +42,7 @@
     <![endif]-->
   </head>
   <body>
+    <header><img src="{{logoImage}}" alt="Meadowlark Travel Logo"></header>
 
     {{#if flash}}
       <div class="alert alert-dismissible alert-{{flash.type}}">
