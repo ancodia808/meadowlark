@@ -214,9 +214,11 @@ app.use('/api', require('cors')());
 //*****************************************************************************
 // REST API Support...
 //*****************************************************************************
+/*
 var connectApp = connect()
   .use(bodyParser.urlencoded({ extended: true }))
   .use(bodyParser.json());
+*/
 
 var apiOptions = {
   context: '/api',
@@ -243,7 +245,7 @@ apiOptions.domain.on('error', function(err){
 var rest = connectRest.create(apiOptions);
 
 // adds connect-rest middleware to connect
-connectApp.use( rest.processRequest() );
+app.use( rest.processRequest() );
 
 
 //*****************************************************************************
